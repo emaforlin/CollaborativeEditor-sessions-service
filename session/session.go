@@ -2,7 +2,6 @@ package sessions
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -20,11 +19,11 @@ type SessionManager struct {
 	wg          sync.WaitGroup
 }
 
-type UserConnectionEvent struct {
-	UserID    string `json:"user_id"`
-	Action    string `json:"action"`
-	Timestamp int64  `json:"timestamp"`
-}
+type PresenceEvent string
+
+const (
+	PRESENCE_EVENTS_SUBJECT = "document.*.presence.*"
+)
 
 func NewSessionManager(natsConn *nats.Conn, redisClient *redis.Client) *SessionManager {
 	return &SessionManager{
@@ -35,7 +34,7 @@ func NewSessionManager(natsConn *nats.Conn, redisClient *redis.Client) *SessionM
 }
 
 func (sm *SessionManager) Start() error {
-	_, err := sm.natsConn.Subscribe("document.*.user", sm.handleConnectionEvent)
+	_, err := sm.natsConn.Subscribe(PRESENCE_EVENTS_SUBJECT, sm.handleConnectionEvent)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to document users events: %w", err)
 	}
@@ -46,27 +45,26 @@ func (sm *SessionManager) Start() error {
 
 func (sm *SessionManager) handleConnectionEvent(msg *nats.Msg) {
 	sm.wg.Add(1)
-	var event UserConnectionEvent
-	if err := json.Unmarshal(msg.Data, &event); err != nil {
-		log.Printf("Failed to unmarshal connection event: %v", err)
-		return
-	}
 
-	documentID := strings.Split(msg.Subject, ".")[1]
+	var userID = string(msg.Data)
 
-	log.Printf("Processing connection event: %+v", event)
+	eventSubjectParts := strings.Split(msg.Subject, ".")
+	documentID := eventSubjectParts[1]
+	action := eventSubjectParts[3]
 
-	switch event.Action {
-	case "join":
-		if err := sm.addUserToDocument(documentID, event.UserID); err != nil {
-			log.Printf("Failed to add user %s to document %s: %v", event.UserID, documentID, err)
+	log.Printf("Processing connection event: %+v", action)
+
+	switch action {
+	case "joined":
+		if err := sm.addUserToDocument(documentID, userID); err != nil {
+			log.Printf("Failed to add user %s to document %s: %v", userID, documentID, err)
 		}
 	case "left":
-		if err := sm.removeUserFromDocument(documentID, event.UserID); err != nil {
-			log.Printf("Failed to remove user %s from document %s: %v", event.UserID, documentID, err)
+		if err := sm.removeUserFromDocument(documentID, userID); err != nil {
+			log.Printf("Failed to remove user %s from document %s: %v", userID, documentID, err)
 		}
 	default:
-		log.Printf("Unknown action: %s", event.Action)
+		log.Printf("Unknown action: %s", action)
 	}
 }
 
