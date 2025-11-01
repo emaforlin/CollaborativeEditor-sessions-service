@@ -13,7 +13,6 @@ import (
 )
 
 type SessionManager struct {
-	natsConn    *nats.Conn
 	redisClient *redis.Client
 	ctx         context.Context
 	wg          sync.WaitGroup
