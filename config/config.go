@@ -1,11 +1,21 @@
 package config
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 var (
-	config *AppConfig
+	config *Config
 	once   sync.Once
 )
+
+type ServerConfig struct {
+	Port         string
+	Host         string
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
+}
 
 type NATSConfig struct {
 	URL string
@@ -17,14 +27,21 @@ type RedisConfig struct {
 	DB       int
 }
 
-type AppConfig struct {
-	NATS  NATSConfig
-	Redis RedisConfig
+type Config struct {
+	Server ServerConfig
+	NATS   NATSConfig
+	Redis  RedisConfig
 }
 
-func Load() *AppConfig {
+func Load() {
 	once.Do(func() {
-		config = &AppConfig{
+		config = &Config{
+			Server: ServerConfig{
+				Port:         getEnv("SERVER_PORT", "9002"),
+				Host:         getEnv("SERVER_HOST", "localhost"),
+				ReadTimeout:  getEnvDuration("SERVER_READ_TIMEOUT", 5*time.Second),
+				WriteTimeout: getEnvDuration("SERVER_READ_TIMEOUT", 2*time.Second),
+			},
 			NATS: NATSConfig{
 				URL: getEnv("NATS_URL", "nats://localhost:4222"),
 			},
@@ -35,5 +52,13 @@ func Load() *AppConfig {
 			},
 		}
 	})
-	return config
+}
+
+func GetConfig() Config {
+	Load()
+	return *config
+}
+
+func (c *Config) GetServerAddress() string {
+	return c.Server.Host + ":" + c.Server.Port
 }
