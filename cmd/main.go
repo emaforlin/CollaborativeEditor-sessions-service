@@ -2,10 +2,16 @@ package main
 
 import (
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/emaforlin/ce-sessions-service/config"
+	"github.com/emaforlin/ce-sessions-service/events"
 	"github.com/emaforlin/ce-sessions-service/redis"
 	"github.com/emaforlin/ce-sessions-service/repository"
+	"github.com/nats-io/nats.go"
 )
 
 func main() {
@@ -17,11 +23,36 @@ func main() {
 		log.Fatalf("failed to establish connection with redis: %v", err)
 	}
 
-	_, err = repository.NewRedisSessionsRepo(redisClient)
+	natsClient, err := nats.Connect(conf.NATS.URL,
+		nats.RetryOnFailedConnect(true),
+		nats.ReconnectWait(2*time.Second),
+	)
 	if err != nil {
-		log.Fatalf("failed to create sessions repository: %v", err)
+		log.Fatalf("failed to connect to NATS: %v", err)
+	}
+	defer natsClient.Close()
+
+	sessionRepository, err := repository.NewRedisSessionsRepo(redisClient)
+	if err != nil {
+		log.Fatalf("failed to initialize the sessions repository: %v", err)
 	}
 
+	eventConsumer := events.NewEventConsumer(natsClient, sessionRepository)
+
+	if err := eventConsumer.Start(); err != nil {
+		log.Fatalf("failed to start event consumer: %v", err)
+	}
+	defer eventConsumer.Stop()
+
+	log.Println("Sessions service started. Waiting for events...")
+
+	// Set up signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Wait for termination signal
+	<-sigChan
+	log.Println("Shutting down sessions service...")
 }
 
 func preStartupSetup() {
