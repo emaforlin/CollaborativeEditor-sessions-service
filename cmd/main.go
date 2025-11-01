@@ -42,15 +42,17 @@ func main() {
 	if err := eventConsumer.Start(); err != nil {
 		log.Fatalf("failed to start event consumer: %v", err)
 	}
-	defer eventConsumer.Stop()
+	defer func() {
+		if err := eventConsumer.Stop(); err != nil {
+			log.Printf("error stopping event consumer: %v", err)
+		}
+	}()
 
 	log.Println("Sessions service started. Waiting for events...")
 
-	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Wait for termination signal
 	<-sigChan
 	log.Println("Shutting down sessions service...")
 }
