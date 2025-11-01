@@ -11,8 +11,7 @@ type RedisSessionRepo struct {
 	redis *redis.Client
 }
 
-func (r *RedisSessionRepo) GetActiveSessions(docID string) ([]string, error) {
-	ctx := context.Background()
+func (r *RedisSessionRepo) GetActiveSessions(ctx context.Context, docID string) ([]string, error) {
 	key := fmt.Sprintf("doc_sessions:%s", docID)
 
 	sessionMembers, err := r.redis.SMembers(ctx, key).Result()
@@ -22,9 +21,7 @@ func (r *RedisSessionRepo) GetActiveSessions(docID string) ([]string, error) {
 	return sessionMembers, nil
 }
 
-func (r *RedisSessionRepo) AddSession(userID, docID string) error {
-	ctx := context.Background()
-
+func (r *RedisSessionRepo) AddSession(ctx context.Context, userID, docID string) error {
 	key := fmt.Sprintf("doc_sessions:%s", docID)
 	_, err := r.redis.SAdd(ctx, key, userID).Result()
 
@@ -34,9 +31,7 @@ func (r *RedisSessionRepo) AddSession(userID, docID string) error {
 	return nil
 }
 
-func (r *RedisSessionRepo) RemoveSession(userID, docID string) error {
-	ctx := context.Background()
-
+func (r *RedisSessionRepo) RemoveSession(ctx context.Context, userID, docID string) error {
 	key := fmt.Sprintf("doc_sessions:%s", docID)
 	_, err := r.redis.SRem(ctx, key, userID).Result()
 
