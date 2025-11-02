@@ -2,11 +2,9 @@ package main
 
 import (
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
+	"github.com/emaforlin/ce-sessions-service/api"
 	"github.com/emaforlin/ce-sessions-service/config"
 	"github.com/emaforlin/ce-sessions-service/events"
 	"github.com/emaforlin/ce-sessions-service/redis"
@@ -50,11 +48,13 @@ func main() {
 
 	log.Println("Sessions service started. Waiting for events...")
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	server := api.NewAPIServer(conf)
 
-	<-sigChan
-	log.Println("Shutting down sessions service...")
+	sessionsHandler := api.NewSessionsHandler(sessionRepository)
+
+	server.RegisterHandler("/session/documents/{document_id}", sessionsHandler.ServeHTTP)
+
+	log.Fatal(server.Start())
 }
 
 func preStartupSetup() {
