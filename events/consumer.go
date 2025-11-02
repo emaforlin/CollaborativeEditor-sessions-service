@@ -57,12 +57,12 @@ func (ec *EventsConsumer) handleEvents(msg *nats.Msg) {
 	switch eventType {
 	case UserJoin:
 		log.Printf("Handle user join - User: %s, Document: %s", eventPayload.UserID, eventPayload.DocumentID)
-		if err := ec.sessionRepository.AddSession(ctx, eventPayload.DocumentID, eventPayload.UserID); err != nil {
+		if err := ec.sessionRepository.AddSessionParticipant(ctx, eventPayload.DocumentID, eventPayload.UserID); err != nil {
 			log.Printf("event handling failed: %v", err)
 		}
 	case UserLeft:
 		log.Printf("Handle user left - User: %s, Document: %s", eventPayload.UserID, eventPayload.DocumentID)
-		if err := ec.sessionRepository.RemoveSession(ctx, eventPayload.DocumentID, eventPayload.UserID); err != nil {
+		if err := ec.sessionRepository.RemoveSessionParticipant(ctx, eventPayload.DocumentID, eventPayload.UserID); err != nil {
 			log.Printf("event handling failed: %v", err)
 		}
 	default:
