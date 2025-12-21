@@ -24,6 +24,7 @@ const (
 	SessionsEventsSubject = "session.>"
 	UserJoin              = "user_joined"
 	UserLeft              = "user_left"
+	SessionEndedSubject   = "session.document.ended"
 )
 
 func NewEventConsumer(natsConn *nats.Conn, sessionRepo repository.SessionRepository) *EventsConsumer {
@@ -45,6 +46,7 @@ func (ec *EventsConsumer) handleEvents(msg *nats.Msg) {
 		log.Printf("invalid event payload: failed to unmarshal: %v", err)
 		return
 	}
+
 	if !isPayloadValid(eventPayload) {
 		log.Printf("invalid event payload: validation failed for payload: %+v", eventPayload)
 		return
@@ -62,16 +64,32 @@ func (ec *EventsConsumer) handleEvents(msg *nats.Msg) {
 		}
 	case UserLeft:
 		log.Printf("Handle user left - User: %s, Document: %s", eventPayload.UserID, eventPayload.DocumentID)
-		if err := ec.sessionRepository.RemoveSessionParticipant(ctx, eventPayload.DocumentID, eventPayload.UserID); err != nil {
+
+		count, err := ec.sessionRepository.RemoveSessionParticipant(ctx, eventPayload.DocumentID, eventPayload.UserID)
+		if err != nil {
 			log.Printf("event handling failed: %v", err)
 		}
+		fmt.Println("SESSION SET CARDINALITY: ", count)
+		if count == 0 {
+			data, err := json.Marshal(&SessionEndedPayload{
+				DocumentID: eventPayload.DocumentID,
+			})
+			if err != nil {
+				log.Printf("failed to encode session ended payload: %v", err)
+				return
+			}
+
+			if err := ec.nats.Publish(SessionEndedSubject, data); err != nil {
+				log.Printf("failed to publish session ended event: %v", err)
+			}
+		}
 	default:
-		log.Printf("Unknown event type: %s", eventType)
+		log.Printf("event type: %s", eventType)
 	}
 }
 
 func (ec *EventsConsumer) Start() error {
-	sub, err := ec.nats.Subscribe(SessionsEventsSubject, ec.handleEvents)
+	sub, err := ec.nats.QueueSubscribe("sessions-service", SessionsEventsSubject, ec.handleEvents)
 	if err != nil {
 		return fmt.Errorf("event subscription failed: %w", err)
 	}
