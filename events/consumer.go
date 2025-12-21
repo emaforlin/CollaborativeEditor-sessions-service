@@ -69,7 +69,6 @@ func (ec *EventsConsumer) handleEvents(msg *nats.Msg) {
 		if err != nil {
 			log.Printf("event handling failed: %v", err)
 		}
-		fmt.Println("SESSION SET CARDINALITY: ", count)
 		if count == 0 {
 			data, err := json.Marshal(&SessionEndedPayload{
 				DocumentID: eventPayload.DocumentID,
