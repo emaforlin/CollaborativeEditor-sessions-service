@@ -88,7 +88,7 @@ func (ec *EventsConsumer) handleEvents(msg *nats.Msg) {
 }
 
 func (ec *EventsConsumer) Start() error {
-	sub, err := ec.nats.QueueSubscribe("sessions-service", SessionsEventsSubject, ec.handleEvents)
+	sub, err := ec.nats.Subscribe(SessionsEventsSubject, ec.handleEvents)
 	if err != nil {
 		return fmt.Errorf("event subscription failed: %w", err)
 	}
